@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rotador de Grupos</title>
+<style>
+  :root{
+    --bg:#0B141A; --panel:#111B21; --panel2:#1A252C; --border:#22313A;
+    --text:#E9EDEF; --muted:#8696A0; --green:#25D366; --green-dark:#128C5E;
+    --amber:#F5B942; --red:#F26D6D;
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+  .wrap{max-width:860px;margin:0 auto;padding:24px 16px 80px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+  h1{font-size:20px;font-weight:700;letter-spacing:-.02em}
+  h1 span{color:var(--green)}
+  .btn{background:var(--green);color:#062E1C;border:none;border-radius:8px;padding:9px 16px;font-weight:600;font-size:14px;cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn.small{padding:5px 10px;font-size:12px;border-radius:6px}
+  .btn.danger{background:transparent;color:var(--red);border:1px solid var(--border)}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:18px}
+  .lista-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .lista-nombre{font-size:17px;font-weight:700}
+  .master{display:flex;align-items:center;gap:8px;margin-top:8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:var(--mono);font-size:13px;color:var(--green);overflow-x:auto;white-space:nowrap}
+  .master button{flex-shrink:0}
+  .meta{color:var(--muted);font-size:12px;margin-top:6px}
+  table{width:100%;border-collapse:collapse;margin-top:14px}
+  th{text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:6px 8px;border-bottom:1px solid var(--border)}
+  td{padding:9px 8px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  .estado{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700}
+  .estado.activo{background:rgba(37,211,102,.15);color:var(--green)}
+  .estado.lleno{background:rgba(242,109,109,.13);color:var(--red)}
+  .estado.cola{background:rgba(134,150,160,.13);color:var(--muted)}
+  .clics{font-family:var(--mono)}
+  .barra{height:4px;background:var(--panel2);border-radius:99px;margin-top:5px;overflow:hidden;min-width:70px}
+  .barra i{display:block;height:100%;background:var(--green);border-radius:99px}
+  .barra i.full{background:var(--red)}
+  .url-corta{color:var(--muted);font-family:var(--mono);font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+  input,textarea{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font-size:14px;font-family:inherit}
+  textarea{font-family:var(--mono);font-size:12px;min-height:90px;resize:vertical}
+  input:focus,textarea:focus{outline:none;border-color:var(--green)}
+  label{display:block;color:var(--muted);font-size:12px;margin:12px 0 5px;font-weight:600}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1}
+  .acciones{display:flex;gap:6px;flex-wrap:wrap}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+  .modal-bg.open{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:22px;width:100%;max-width:440px}
+  .modal h2{font-size:16px;margin-bottom:4px}
+  .modal p{color:var(--muted);font-size:13px}
+  .modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+  .login{max-width:340px;margin:15vh auto;text-align:center}
+  .login h1{margin-bottom:18px}
+  .vacio{color:var(--muted);text-align:center;padding:30px;font-size:14px}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--green);color:#062E1C;padding:10px 18px;border-radius:99px;font-weight:600;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  @media(max-width:560px){ td:nth-child(3),th:nth-child(3){display:none} }
+</style>
+</head>
+<body>
+<div id="app" class="wrap"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const app = $("#app");
+let listas = [];
+
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); }
+async function api(url, opts={}){
+  const r = await fetch(url,{headers:{"Content-Type":"application/json"},...opts});
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok){ toast(d.error||"Error"); throw new Error(d.error); }
+  return d;
+}
+function copiar(txt){ navigator.clipboard.writeText(txt); toast("Link copiado"); }
+function esc(s){ return (s||"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+// ---------- LOGIN ----------
+function renderLogin(){
+  app.innerHTML = `
+    <div class="login">
+      <h1>Rotador <span>WA</span></h1>
+      <input type="password" id="pw" placeholder="Contraseña" autofocus>
+      <div style="margin-top:12px"><button class="btn" style="width:100%" onclick="login()">Entrar</button></div>
+    </div>`;
+  $("#pw").addEventListener("keydown", e=>{ if(e.key==="Enter") login(); });
+}
+async function login(){
+  await api("/api/login",{method:"POST",body:JSON.stringify({password:$("#pw").value})});
+  cargar();
+}
+
+// ---------- PANEL ----------
+function renderPanel(){
+  app.innerHTML = `
+    <header>
+      <h1>Rotador <span>WA</span></h1>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="modalNuevaLista()">+ Nueva lista</button>
+        <button class="btn ghost small" onclick="api('/api/logout',{method:'POST'}).then(renderLogin)">Salir</button>
+      </div>
+    </header>
+    <div id="listas"></div>
+    <div class="modal-bg" id="modal"></div>`;
+  const cont = $("#listas");
+  if(!listas.length){ cont.innerHTML = `<div class="card vacio">Todavía no hay listas.<br>Creá la primera con <b>+ Nueva lista</b>, después le cargás los links de los grupos.</div>`; return; }
+  cont.innerHTML = listas.map(renderLista).join("");
+}
+
+function renderLista(l){
+  const master = location.origin + "/r/" + l.slug;
+  const activos = l.grupos.filter(g=>g.estado!=="lleno").length;
+  return `
+  <div class="card">
+    <div class="lista-head">
+      <div>
+        <div class="lista-nombre">${esc(l.nombre)}</div>
+        <div class="master">${master} <button class="btn small" onclick="copiar('${master}')">Copiar</button></div>
+        <div class="meta">Rota a los <b>${l.umbral}</b> clics · ${l.grupos.length} grupos cargados · ${activos} disponibles · ${l.total_clics} clics totales</div>
+      </div>
+      <div class="acciones">
+        <button class="btn small ghost" onclick="modalAgregarGrupos(${l.id})">+ Agregar grupos</button>
+        <button class="btn small ghost" onclick="modalEditarLista(${l.id})">Editar</button>
+        <button class="btn small danger" onclick="borrarLista(${l.id})">Borrar</button>
+      </div>
+    </div>
+    ${l.grupos.length ? tabla(l) : `<div class="vacio">Sin grupos. Agregá los links de invitación.</div>`}
+  </div>`;
+}
+
+function tabla(l){
+  return `<table>
+    <tr><th>Grupo</th><th>Estado</th><th>Link</th><th>Clics</th><th></th></tr>
+    ${l.grupos.map(g=>{
+      const pct = Math.min(100, Math.round(g.clics / l.umbral * 100));
+      return `<tr>
+        <td><b>${esc(g.etiqueta)}</b></td>
+        <td><span class="estado ${g.estado}">${g.estado==="cola"?"en cola":g.estado}</span></td>
+        <td><span class="url-corta" title="${esc(g.url)}">${esc(g.url)}</span></td>
+        <td class="clics">${g.clics} / ${l.umbral}
+          <div class="barra"><i class="${g.estado==='lleno'?'full':''}" style="width:${pct}%"></i></div>
+        </td>
+        <td class="acciones">
+          ${g.estado!=="lleno"
+            ? `<button class="btn small ghost" onclick="accionGrupo(${g.id},'lleno')">Marcar lleno</button>`
+            : `<button class="btn small ghost" onclick="accionGrupo(${g.id},'reabrir')">Reabrir</button>`}
+          <button class="btn small danger" onclick="borrarGrupo(${g.id})">✕</button>
+        </td>
+      </tr>`;
+    }).join("")}
+  </table>`;
+}
+
+// ---------- MODALES ----------
+function abrirModal(html){ const m=$("#modal"); m.innerHTML=`<div class="modal">${html}</div>`; m.classList.add("open"); }
+function cerrarModal(){ $("#modal").classList.remove("open"); }
+
+function modalNuevaLista(){
+  abrirModal(`
+    <h2>Nueva lista</h2>
+    <p>Una lista = un link maestro que rota entre varios grupos.</p>
+    <label>Nombre</label><input id="f-nombre" placeholder="Grupo VIP Recetas">
+    <label>Rotar al llegar a (clics)</label><input id="f-umbral" type="number" value="950">
+    <label>Link de respaldo si todo se llena (opcional)</label><input id="f-fallback" placeholder="https://wa.me/...">
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn" onclick="crearLista()">Crear</button>
+    </div>`);
+}
+async function crearLista(){
+  await api("/api/listas",{method:"POST",body:JSON.stringify({
+    nombre:$("#f-nombre").value, umbral:$("#f-umbral").value, fallback_url:$("#f-fallback").value })});
+  cerrarModal(); cargar(); toast("Lista creada");
+}
+
+function modalEditarLista(id){
+  const l = listas.find(x=>x.id===id);
+  abrirModal(`
+    <h2>Editar lista</h2>
+    <label>Nombre</label><input id="f-nombre" value="${esc(l.nombre)}">
+    <label>Rotar al llegar a (clics)</label><input id="f-umbral" type="number" value="${l.umbral}">
+    <label>Link de respaldo</label><input id="f-fallback" value="${esc(l.fallback_url)}">
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn" onclick="guardarLista(${id})">Guardar</button>
+    </div>`);
+}
+async function guardarLista(id){
+  await api("/api/listas/"+id,{method:"PATCH",body:JSON.stringify({
+    nombre:$("#f-nombre").value, umbral:$("#f-umbral").value, fallback_url:$("#f-fallback").value })});
+  cerrarModal(); cargar(); toast("Guardado");
+}
+
+function modalAgregarGrupos(id){
+  abrirModal(`
+    <h2>Agregar grupos</h2>
+    <p>Pegá los links de invitación, <b>uno por línea</b>. Se suman al final de la cola.</p>
+    <label>Links</label>
+    <textarea id="f-urls" placeholder="https://chat.whatsapp.com/AAA...\nhttps://chat.whatsapp.com/BBB...\nhttps://chat.whatsapp.com/CCC..."></textarea>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn" onclick="agregarGrupos(${id})">Agregar</button>
+    </div>`);
+}
+async function agregarGrupos(id){
+  await api(`/api/listas/${id}/grupos`,{method:"POST",body:JSON.stringify({urls:$("#f-urls").value})});
+  cerrarModal(); cargar(); toast("Grupos agregados");
+}
+
+// ---------- ACCIONES ----------
+async function accionGrupo(id, accion){ await api("/api/grupos/"+id,{method:"PATCH",body:JSON.stringify({accion})}); cargar(); }
+async function borrarGrupo(id){ if(!confirm("¿Borrar este grupo de la lista?")) return; await api("/api/grupos/"+id,{method:"DELETE"}); cargar(); }
+async function borrarLista(id){ if(!confirm("¿Borrar la lista completa y todos sus grupos?")) return; await api("/api/listas/"+id,{method:"DELETE"}); cargar(); toast("Lista borrada"); }
+
+// ---------- INIT ----------
+async function cargar(){
+  try{ listas = await api("/api/listas"); renderPanel(); }
+  catch{ renderLogin(); }
+}
+fetch("/api/me").then(r=>r.json()).then(d=> d.auth ? cargar() : renderLogin());
+setInterval(()=>{ if(listas.length && $("#listas") && !$("#modal").classList.contains("open")) cargar(); }, 15000);
+</script>
+</body>
+</html>
