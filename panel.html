@@ -17,6 +17,8 @@
   header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}
   h1{font-size:24px;font-weight:700;letter-spacing:-.02em}
   h1 span{color:var(--green)}
+  .user-info{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px}
+  .user-avatar{width:36px;height:36px;border-radius:50%;background:var(--green);color:#062E1C;display:flex;align-items:center;justify-content:center;font-weight:700}
   .btn{background:var(--green);color:#062E1C;border:none;border-radius:8px;padding:10px 18px;font-weight:600;font-size:14px;cursor:pointer;transition:all .2s}
   .btn:hover{filter:brightness(1.08)}
   .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
@@ -66,11 +68,14 @@
   .add-nicho{text-align:center;padding:40px 20px}
   .add-nicho button{font-size:16px;padding:14px 24px}
 
-  .login{max-width:360px;margin:15vh auto;text-align:center}
-  .login h1{margin-bottom:20px}
-  .login input{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:8px;font-size:14px;margin-bottom:12px}
-  .login input:focus{outline:none;border-color:var(--green)}
-  .login button{width:100%}
+  .auth-form{max-width:400px;margin:20vh auto;text-align:center;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:40px 30px}
+  .auth-form h1{margin-bottom:8px}
+  .auth-form .subtitle{color:var(--muted);font-size:14px;margin-bottom:28px}
+  .auth-form input{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:11px 13px;border-radius:8px;font-size:14px;margin-bottom:12px}
+  .auth-form input:focus{outline:none;border-color:var(--green)}
+  .auth-form .btn{width:100%;margin-bottom:14px}
+  .auth-form .toggle{color:var(--muted);font-size:13px;margin-top:20px;border-top:1px solid var(--border);padding-top:16px}
+  .auth-form .toggle a{color:var(--green);cursor:pointer;text-decoration:underline}
 
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--green);color:#062E1C;padding:10px 18px;border-radius:99px;font-weight:600;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:100}
   .toast.show{opacity:1}
@@ -105,9 +110,14 @@
   .tutorial-progress span{width:8px;height:8px;border-radius:50%;background:var(--border);transition:all .2s}
   .tutorial-progress span.active{background:var(--green);width:24px;border-radius:4px}
 
-  .tutorial-hint{position:fixed;bottom:20px;right:20px;background:var(--panel);border:2px solid var(--green);border-radius:10px;padding:14px 16px;font-size:12px;color:var(--text);max-width:200px;cursor:pointer;z-index:40;transition:all .2s}
-  .tutorial-hint:hover{transform:scale(1.05)}
-  .tutorial-hint-badge{display:inline-block;background:var(--green);color:#062E1C;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700;margin-bottom:6px}
+  .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px}
+  .tab-btn{padding:12px 18px;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;transition:all .2s}
+  .tab-btn.active{color:var(--green);border-bottom-color:var(--green)}
+  .tab-btn:hover{color:var(--text)}
+
+  .colab-item{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+  .colab-email{font-size:13px;color:var(--text)}
+  .colab-nombre{font-size:11px;color:var(--muted)}
 
   @media(max-width:720px){
     .nichos-grid{grid-template-columns:1fr}
@@ -124,66 +134,42 @@
 <div class="toast" id="toast"></div>
 <div class="modal-bg" id="modal"></div>
 <div class="tutorial-modal hidden" id="tutorial"></div>
-<div class="tutorial-hint hidden" id="hint" onclick="abrirTutorial()">
-  <div class="tutorial-hint-badge">💡 TUTORIAL</div>
-  <div>Aprende cómo usar</div>
-</div>
 
 <script>
 const $ = s => document.querySelector(s);
 const app = $("#app");
 const modal = $("#modal");
 const tutorial = $("#tutorial");
-const hint = $("#hint");
 let nichos = [];
+let usuarioActual = null;
 let tutorialStep = 0;
+let colaboradores = [];
 
-// ---------- TUTORIAL ----------
 const tutorialSteps = [
-  {
-    icon: "🎯",
-    title: "Bienvenido",
-    text: "Aquí gestionás todos tus Nichos (categorías) y sus grupos de WhatsApp",
-    cta: "Siguiente"
-  },
-  {
-    icon: "📂",
-    title: "¿Qué es un Nicho?",
-    text: "Un Nicho es una categoría (Ej: dinero, bajar de peso, recetas). Cada uno tiene su propio link maestro que rota entre grupos.",
-    cta: "Siguiente"
-  },
-  {
-    icon: "🔗",
-    title: "Link Maestro",
-    text: "El link que compartes con tus clientes. Cuando se llena un grupo, automáticamente rota al siguiente. ¡Un solo link para todos!",
-    cta: "Siguiente"
-  },
-  {
-    icon: "⚡",
-    title: "Umbral de Clics",
-    text: "Es a cuántos clics se llena un grupo y rota. Si cada 100 clics entran ~70 personas, para 1024 miembros pon 1350 clics.",
-    cta: "Siguiente"
-  },
-  {
-    icon: "👥",
-    title: "Agregar Grupos",
-    text: "Pega todos los links de WhatsApp de tus grupos. Pueden ser de una vez (uno por línea). El sistema se encarga de rotar automáticamente.",
-    cta: "Siguiente"
-  },
-  {
-    icon: "✅",
-    title: "¡Listo!",
-    text: "Ya sabés cómo usar. Crea tu primer nicho y agrá tus grupos. El link maestro empieza a rotar automáticamente.",
-    cta: "Entendido"
-  }
+  {icon:"🎯",title:"Bienvenido",text:"Aquí gestionás todos tus Nichos (categorías) y sus grupos de WhatsApp",cta:"Siguiente"},
+  {icon:"📂",title:"¿Qué es un Nicho?",text:"Un Nicho es una categoría (Ej: dinero, bajar de peso, recetas). Cada uno tiene su propio link maestro que rota entre grupos.",cta:"Siguiente"},
+  {icon:"🔗",title:"Link Maestro",text:"El link que compartes con tus clientes. Cuando se llena un grupo, automáticamente rota al siguiente. ¡Un solo link para todos!",cta:"Siguiente"},
+  {icon:"⚡",title:"Umbral de Clics",text:"Es a cuántos clics se llena un grupo y rota. Si cada 100 clics entran ~70 personas, para 1024 miembros pon 1350 clics.",cta:"Siguiente"},
+  {icon:"👥",title:"Agregar Grupos",text:"Pega todos los links de WhatsApp de tus grupos. Pueden ser de una vez (uno por línea). El sistema se encarga de rotar automáticamente.",cta:"Siguiente"},
+  {icon:"✅",title:"¡Listo!",text:"Ya sabés cómo usar. Crea tu primer nicho y agregá tus grupos. El link maestro empieza a rotar automáticamente.",cta:"Entendido"}
 ];
 
+// ---------- API ----------
+async function api(url, opts={}){
+  const r = await fetch(url,{headers:{"Content-Type":"application/json"},...opts});
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok){ toast(d.error||"Error"); throw new Error(d.error); }
+  return d;
+}
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); }
+function copiar(txt){ navigator.clipboard.writeText(txt); toast("Copiado"); }
+
+// ---------- TUTORIAL ----------
 function renderTutorialStep(){
   const step = tutorialSteps[tutorialStep];
   const progress = Array.from({length:tutorialSteps.length}, (_, i) =>
     `<span class="${i === tutorialStep ? 'active' : ''}"></span>`
   ).join('');
-
   tutorial.innerHTML = `
     <div class="tutorial-slide">
       <div class="step-number">Paso ${tutorialStep + 1} de ${tutorialSteps.length}</div>
@@ -198,7 +184,6 @@ function renderTutorialStep(){
     </div>
   `;
 }
-
 function nextTutorial(){
   if(tutorialStep < tutorialSteps.length - 1){
     tutorialStep++;
@@ -207,78 +192,111 @@ function nextTutorial(){
     closeTutorial();
   }
 }
-
 function prevTutorial(){
   if(tutorialStep > 0){
     tutorialStep--;
     renderTutorialStep();
   }
 }
-
 function abrirTutorial(){
   tutorialStep = 0;
   renderTutorialStep();
   tutorial.classList.remove("hidden");
 }
-
 function closeTutorial(){
   tutorial.classList.add("hidden");
   localStorage.setItem("tutorialVisto", "true");
-  hint.classList.add("hidden");
 }
-
 function verificarTutorial(){
   const visto = localStorage.getItem("tutorialVisto");
-  if(!visto){
-    setTimeout(() => abrirTutorial(), 800);
-  } else {
-    hint.classList.remove("hidden");
-  }
+  if(!visto) setTimeout(() => abrirTutorial(), 800);
 }
 
-async function api(url, opts={}){
-  const r = await fetch(url,{headers:{"Content-Type":"application/json"},...opts});
-  const d = await r.json().catch(()=>({}));
-  if(!r.ok){ toast(d.error||"Error"); throw new Error(d.error); }
-  return d;
-}
-function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); }
-function copiar(txt){ navigator.clipboard.writeText(txt); toast("Copiado"); }
-
-// ---------- LOGIN ----------
+// ---------- AUTH ----------
 function renderLogin(){
   app.innerHTML = `
-    <div class="login">
-      <h1>Rotador <span>WA</span></h1>
-      <p style="color:var(--muted);margin-bottom:20px">Gesiona tus nichos y grupos</p>
-      <input type="password" id="pw" placeholder="Contraseña" autofocus>
-      <button class="btn" style="width:100%" onclick="login()">Entrar</button>
-    </div>`;
-  $("#pw").addEventListener("keydown", e=>{ if(e.key==="Enter") login(); });
+    <div class="auth-form">
+      <h1>Rotador <span style="color:var(--green)">WA</span></h1>
+      <p class="subtitle" id="subtitle">Inicia sesión para continuar</p>
+      <div id="formContent"></div>
+    </div>
+  `;
+  mostrarLogin();
 }
+
+function mostrarLogin(){
+  document.getElementById("formContent").innerHTML = `
+    <input type="email" id="email" placeholder="Email" autofocus>
+    <input type="password" id="password" placeholder="Contraseña">
+    <button class="btn" onclick="login()" style="width:100%">Entrar</button>
+    <div class="toggle">¿No tenés cuenta? <a onclick="mostrarRegistro()">Crear una</a></div>
+  `;
+  document.getElementById("email").addEventListener("keydown", e => { if(e.key==="Enter") login(); });
+}
+
+function mostrarRegistro(){
+  document.getElementById("subtitle").textContent = "Crear nueva cuenta";
+  document.getElementById("formContent").innerHTML = `
+    <input type="text" id="nombre" placeholder="Tu nombre" autofocus>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Contraseña (mín. 6 caracteres)">
+    <button class="btn" onclick="register()" style="width:100%">Registrarse</button>
+    <div class="toggle">¿Ya tenés cuenta? <a onclick="mostrarLogin()">Inicia sesión</a></div>
+  `;
+  document.getElementById("nombre").addEventListener("keydown", e => { if(e.key==="Enter") register(); });
+}
+
 async function login(){
-  await api("/api/login",{method:"POST",body:JSON.stringify({password:$("#pw").value})});
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  if(!email || !password) return toast("Completa los campos");
+  await api("/api/login",{method:"POST",body:JSON.stringify({email,password})});
   cargar();
 }
 
-// ---------- MAIN PANEL ----------
+async function register(){
+  const nombre = document.getElementById("nombre").value.trim();
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  if(!nombre || !email || !password) return toast("Completa todos los campos");
+  if(password.length < 6) return toast("Contraseña mínimo 6 caracteres");
+  await api("/api/register",{method:"POST",body:JSON.stringify({nombre,email,password})});
+  cargar();
+}
+
+// ---------- MAIN ----------
 async function cargar(){
-  nichos = await api("/api/listas");
-  renderPanel();
+  try {
+    usuarioActual = await api("/api/me");
+    nichos = await api("/api/listas");
+    colaboradores = await api("/api/colaboradores");
+    renderPanel();
+    verificarTutorial();
+  } catch(e) {
+    renderLogin();
+  }
 }
 
 function renderPanel(){
+  const initial = usuarioActual.nombre.charAt(0).toUpperCase();
   app.innerHTML = `
     <header>
       <h1>Rotador <span>WA</span></h1>
-      <div style="display:flex;gap:10px;align-items:center">
-        <button class="btn ghost" onclick="abrirTutorial()" style="font-size:12px">💡 Tutorial</button>
-        <button class="btn" onclick="logout()">Salir</button>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div class="user-info">
+          <div class="user-avatar">${initial}</div>
+          <div>
+            <div>${usuarioActual.nombre}</div>
+            <div style="font-size:11px">${usuarioActual.email}</div>
+          </div>
+        </div>
+        <button class="btn ghost small" onclick="abrirTutorial()">💡 Tutorial</button>
+        <button class="btn ghost small" onclick="abrirColaboradores()">👥 Colaboradores</button>
+        <button class="btn small" onclick="logout()">Salir</button>
       </div>
     </header>
     <div id="nichos"></div>
   `;
-  verificarTutorial();
 
   const nichos_div = $("#nichos");
   if(!nichos.length){
@@ -303,7 +321,6 @@ function renderPanel(){
 function renderNicho(n){
   const card = document.createElement("div");
   card.className = "nicho-card";
-
   const linkMaestro = `${window.location.origin}/r/${n.slug}`;
   const progreso = Math.min(100, Math.round((n.total_clics / n.umbral) * 100));
 
@@ -312,7 +329,6 @@ function renderNicho(n){
       <div class="nicho-nombre">${n.nombre}</div>
       <div class="grupo-estado ${n.grupos && n.grupos[0]?.estado || 'cola'}">${n.grupos && n.grupos[0]?.estado || 'cola'}</div>
     </div>
-
     <div class="link-maestro-box">
       <span class="link-maestro-label">🔗 Link Maestro</span>
       <div class="link-maestro">
@@ -320,17 +336,14 @@ function renderNicho(n){
         <button class="btn small" onclick="copiar('${linkMaestro}')">Copy</button>
       </div>
     </div>
-
     <div class="umbral-control">
       <span class="umbral-label">⚡ Clics para rotar: ${n.umbral}</span>
       <div class="umbral-row">
-        <input type="number" id="umbral_${n.id}" value="${n.umbral}" min="100" max="5000" step="50" placeholder="Nuevo umbral">
+        <input type="number" id="umbral_${n.id}" value="${n.umbral}" min="100" max="5000" step="50">
         <button class="btn small" onclick="guardarUmbral(${n.id})">Guardar</button>
       </div>
     </div>
-
     <div class="grupos-list" id="grupos_${n.id}"></div>
-
     <div class="nicho-actions">
       <button class="btn small" onclick="abrirModalGrupos(${n.id})">+ Agregar Grupos</button>
       <button class="btn small ghost" onclick="editarNicho(${n.id})">Editar</button>
@@ -365,7 +378,6 @@ function renderNicho(n){
       grupos_div.appendChild(item);
     });
   }
-
   return card;
 }
 
@@ -487,17 +499,65 @@ async function agregarGrupos(lista_id){
   toast("Grupos agregados");
 }
 
+function abrirColaboradores(){
+  modal.innerHTML = `
+    <div class="modal">
+      <h2>👥 Colaboradores</h2>
+      <p>Gestiona quién tiene acceso a tus nichos</p>
+      <div class="colaboradores-list" id="colab_list"></div>
+      <label style="margin-top:20px">Agregar Colaborador</label>
+      <input type="email" id="colab_email" placeholder="Email del colaborador">
+      <div class="modal-footer">
+        <button class="btn ghost" onclick="modal.classList.remove('open')">Cerrar</button>
+        <button class="btn" onclick="agregarColaborador()">Agregar</button>
+      </div>
+    </div>
+  `;
+  modal.classList.add("open");
+  renderColaboradores();
+}
+
+function renderColaboradores(){
+  const list = document.getElementById("colab_list");
+  if(!colaboradores.length){
+    list.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">Sin colaboradores aún</p>';
+  } else {
+    list.innerHTML = colaboradores.map(c => `
+      <div class="colab-item">
+        <div>
+          <div class="colab-email">${c.email}</div>
+          <div class="colab-nombre">${c.nombre}</div>
+        </div>
+        <button class="btn small danger" onclick="quitarColaborador(${c.id})">Quitar</button>
+      </div>
+    `).join('');
+  }
+}
+
+async function agregarColaborador(){
+  const email = document.getElementById("colab_email").value.trim();
+  if(!email) return toast("Ingresa un email");
+  await api("/api/colaboradores",{method:"POST",body:JSON.stringify({email})});
+  colaboradores = await api("/api/colaboradores");
+  renderColaboradores();
+  document.getElementById("colab_email").value = "";
+  toast("Colaborador agregado");
+}
+
+async function quitarColaborador(id){
+  if(!confirm("¿Remover este colaborador?")) return;
+  await api(`/api/colaboradores/${id}`,{method:"DELETE"});
+  colaboradores = await api("/api/colaboradores");
+  renderColaboradores();
+}
+
 async function logout(){
   await api("/api/logout",{method:"POST"});
   renderLogin();
 }
 
 // INIT
-(async ()=>{
-  const me = await api("/api/me");
-  if(me.auth) cargar();
-  else renderLogin();
-})();
+cargar();
 </script>
 </body>
 </html>
