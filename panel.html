@@ -91,10 +91,31 @@
   .empty{text-align:center;padding:60px 20px;color:var(--muted)}
   .empty p{margin-bottom:20px;font-size:14px}
 
+  .tutorial-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100;backdrop-filter:blur(2px)}
+  .tutorial-modal.hidden{display:none}
+  .tutorial-slide{background:var(--panel);border:2px solid var(--green);border-radius:14px;padding:40px;width:100%;max-width:600px;text-align:center;animation:slideIn .3s}
+  @keyframes slideIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+  .tutorial-slide h2{font-size:28px;color:var(--green);margin-bottom:12px}
+  .tutorial-slide .step-number{display:inline-block;background:var(--green);color:#062E1C;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:700;margin-bottom:16px}
+  .tutorial-slide p{color:var(--muted);font-size:15px;line-height:1.6;margin-bottom:20px}
+  .tutorial-slide .icon{font-size:60px;margin-bottom:16px}
+  .tutorial-controls{display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap}
+  .tutorial-controls button{min-width:120px}
+  .tutorial-progress{display:flex;gap:6px;justify-content:center;margin-top:20px}
+  .tutorial-progress span{width:8px;height:8px;border-radius:50%;background:var(--border);transition:all .2s}
+  .tutorial-progress span.active{background:var(--green);width:24px;border-radius:4px}
+
+  .tutorial-hint{position:fixed;bottom:20px;right:20px;background:var(--panel);border:2px solid var(--green);border-radius:10px;padding:14px 16px;font-size:12px;color:var(--text);max-width:200px;cursor:pointer;z-index:40;transition:all .2s}
+  .tutorial-hint:hover{transform:scale(1.05)}
+  .tutorial-hint-badge{display:inline-block;background:var(--green);color:#062E1C;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700;margin-bottom:6px}
+
   @media(max-width:720px){
     .nichos-grid{grid-template-columns:1fr}
     .grupo-acciones{flex-direction:row;width:100%}
     .grupo-acciones button{flex:1}
+    .tutorial-slide{padding:30px 20px}
+    .tutorial-slide h2{font-size:22px}
+    .tutorial-slide .icon{font-size:48px}
   }
 </style>
 </head>
@@ -102,12 +123,118 @@
 <div id="app" class="wrap"></div>
 <div class="toast" id="toast"></div>
 <div class="modal-bg" id="modal"></div>
+<div class="tutorial-modal hidden" id="tutorial"></div>
+<div class="tutorial-hint hidden" id="hint" onclick="abrirTutorial()">
+  <div class="tutorial-hint-badge">💡 TUTORIAL</div>
+  <div>Aprende cómo usar</div>
+</div>
 
 <script>
 const $ = s => document.querySelector(s);
 const app = $("#app");
 const modal = $("#modal");
+const tutorial = $("#tutorial");
+const hint = $("#hint");
 let nichos = [];
+let tutorialStep = 0;
+
+// ---------- TUTORIAL ----------
+const tutorialSteps = [
+  {
+    icon: "🎯",
+    title: "Bienvenido",
+    text: "Aquí gestionás todos tus Nichos (categorías) y sus grupos de WhatsApp",
+    cta: "Siguiente"
+  },
+  {
+    icon: "📂",
+    title: "¿Qué es un Nicho?",
+    text: "Un Nicho es una categoría (Ej: dinero, bajar de peso, recetas). Cada uno tiene su propio link maestro que rota entre grupos.",
+    cta: "Siguiente"
+  },
+  {
+    icon: "🔗",
+    title: "Link Maestro",
+    text: "El link que compartes con tus clientes. Cuando se llena un grupo, automáticamente rota al siguiente. ¡Un solo link para todos!",
+    cta: "Siguiente"
+  },
+  {
+    icon: "⚡",
+    title: "Umbral de Clics",
+    text: "Es a cuántos clics se llena un grupo y rota. Si cada 100 clics entran ~70 personas, para 1024 miembros pon 1350 clics.",
+    cta: "Siguiente"
+  },
+  {
+    icon: "👥",
+    title: "Agregar Grupos",
+    text: "Pega todos los links de WhatsApp de tus grupos. Pueden ser de una vez (uno por línea). El sistema se encarga de rotar automáticamente.",
+    cta: "Siguiente"
+  },
+  {
+    icon: "✅",
+    title: "¡Listo!",
+    text: "Ya sabés cómo usar. Crea tu primer nicho y agrá tus grupos. El link maestro empieza a rotar automáticamente.",
+    cta: "Entendido"
+  }
+];
+
+function renderTutorialStep(){
+  const step = tutorialSteps[tutorialStep];
+  const progress = Array.from({length:tutorialSteps.length}, (_, i) =>
+    `<span class="${i === tutorialStep ? 'active' : ''}"></span>`
+  ).join('');
+
+  tutorial.innerHTML = `
+    <div class="tutorial-slide">
+      <div class="step-number">Paso ${tutorialStep + 1} de ${tutorialSteps.length}</div>
+      <div class="icon">${step.icon}</div>
+      <h2>${step.title}</h2>
+      <p>${step.text}</p>
+      <div class="tutorial-controls">
+        ${tutorialStep > 0 ? `<button class="btn ghost" onclick="prevTutorial()">← Atrás</button>` : ''}
+        <button class="btn" onclick="nextTutorial()">${step.cta}</button>
+      </div>
+      <div class="tutorial-progress">${progress}</div>
+    </div>
+  `;
+}
+
+function nextTutorial(){
+  if(tutorialStep < tutorialSteps.length - 1){
+    tutorialStep++;
+    renderTutorialStep();
+  } else {
+    closeTutorial();
+  }
+}
+
+function prevTutorial(){
+  if(tutorialStep > 0){
+    tutorialStep--;
+    renderTutorialStep();
+  }
+}
+
+function abrirTutorial(){
+  tutorialStep = 0;
+  renderTutorialStep();
+  tutorial.classList.remove("hidden");
+}
+
+function closeTutorial(){
+  tutorial.classList.add("hidden");
+  localStorage.setItem("tutorialVisto", "true");
+  hint.classList.add("hidden");
+}
+
+function verificarTutorial(){
+  const visto = localStorage.getItem("tutorialVisto");
+  if(!visto){
+    setTimeout(() => abrirTutorial(), 800);
+  } else {
+    hint.classList.remove("hidden");
+  }
+}
 
 async function api(url, opts={}){
   const r = await fetch(url,{headers:{"Content-Type":"application/json"},...opts});
@@ -144,10 +271,14 @@ function renderPanel(){
   app.innerHTML = `
     <header>
       <h1>Rotador <span>WA</span></h1>
-      <button class="btn" onclick="logout()">Salir</button>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="btn ghost" onclick="abrirTutorial()" style="font-size:12px">💡 Tutorial</button>
+        <button class="btn" onclick="logout()">Salir</button>
+      </div>
     </header>
     <div id="nichos"></div>
   `;
+  verificarTutorial();
 
   const nichos_div = $("#nichos");
   if(!nichos.length){
