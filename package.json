@@ -10,7 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "better-sqlite3": "^13.0.2",
+    "sqlite3": "^5.1.7",
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1"
   }
