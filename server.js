@@ -274,20 +274,27 @@ app.get("/r/:slug", (req, res) => {
 
 // ---------- API LISTAS ----------
 app.get("/api/listas", auth, (req, res) => {
-  db.all("SELECT * FROM listas WHERE usuario_id=? ORDER BY id", [req.userId], (err, listas) => {
-    if (err || !listas) return res.json([]);
-    let remaining = listas.length;
-    if (remaining === 0) return res.json([]);
+  db.all(
+    `SELECT DISTINCT l.* FROM listas l
+     LEFT JOIN colaboradores c ON l.usuario_id = c.usuario_id
+     WHERE l.usuario_id=? OR c.colaborador_id=?
+     ORDER BY l.id`,
+    [req.userId, req.userId],
+    (err, listas) => {
+      if (err || !listas) return res.json([]);
+      let remaining = listas.length;
+      if (remaining === 0) return res.json([]);
 
-    const result = [];
-    listas.forEach((l, idx) => {
-      listaConGrupos(l, (err, listWithGrupos) => {
-        if (!err) result[idx] = listWithGrupos;
-        remaining--;
-        if (remaining === 0) res.json(result.filter(Boolean));
+      const result = [];
+      listas.forEach((l, idx) => {
+        listaConGrupos(l, (err, listWithGrupos) => {
+          if (!err) result[idx] = listWithGrupos;
+          remaining--;
+          if (remaining === 0) res.json(result.filter(Boolean));
+        });
       });
-    });
-  });
+    }
+  );
 });
 
 app.post("/api/listas", auth, (req, res) => {
