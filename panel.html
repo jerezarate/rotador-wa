@@ -333,6 +333,149 @@ async function resetPassword(){
   setTimeout(() => mostrarLogin(), 1500);
 }
 
+// ---------- PERFIL Y ESTADÍSTICAS ----------
+let estadisticas = {};
+let actividades = [];
+
+async function abrirPerfil(){
+  estadisticas = await api("/api/estadisticas");
+  actividades = await api("/api/actividades");
+
+  modal.innerHTML = `
+    <div class="modal" style="max-width:700px">
+      <h2>👤 Mi Perfil</h2>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchPerfil('datos', this)">Datos</button>
+        <button class="tab-btn" onclick="switchPerfil('estadisticas', this)">Estadísticas</button>
+        <button class="tab-btn" onclick="switchPerfil('actividades', this)">Actividades</button>
+      </div>
+      <div id="perfil-content"></div>
+    </div>
+  `;
+  modal.classList.add("open");
+  mostrarDatos();
+}
+
+function switchPerfil(tab, btn){
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  if(tab === "datos") mostrarDatos();
+  else if(tab === "estadisticas") mostrarEstadisticas();
+  else mostrarActividades();
+}
+
+function mostrarDatos(){
+  const content = document.getElementById("perfil-content");
+  content.innerHTML = `
+    <div style="padding:16px 0">
+      <label>Nombre</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="edit_nombre" value="${usuarioActual.nombre}">
+        <button class="btn small" onclick="guardarNombre()">Guardar</button>
+      </div>
+
+      <label style="margin-top:20px">Email</label>
+      <input type="email" value="${usuarioActual.email}" disabled style="background:var(--panel2);color:var(--muted)">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">No puedes cambiar tu email</div>
+
+      <label style="margin-top:20px">Rol</label>
+      <input type="text" value="${usuarioActual.rol.toUpperCase()}" disabled style="background:var(--panel2);color:var(--muted)">
+
+      <label style="margin-top:20px">Cambiar Contraseña</label>
+      <button class="btn ghost small" onclick="abrirCambiarContrasena()" style="width:100%">🔐 Cambiar Contraseña</button>
+    </div>
+  `;
+}
+
+function mostrarEstadisticas(){
+  const content = document.getElementById("perfil-content");
+  content.innerHTML = `
+    <div style="padding:16px 0;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:16px">
+        <div style="font-size:28px;font-weight:700;color:var(--green)">${estadisticas.nichos_totales || 0}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Nichos Activos</div>
+      </div>
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:16px">
+        <div style="font-size:28px;font-weight:700;color:var(--green)">${estadisticas.grupos_totales || 0}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Grupos Totales</div>
+      </div>
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:16px">
+        <div style="font-size:28px;font-weight:700;color:var(--green)">${(estadisticas.clics_totales || 0).toLocaleString()}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Clics Totales</div>
+      </div>
+      <div style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:16px">
+        <div style="font-size:28px;font-weight:700;color:var(--green)">${estadisticas.colaboradores_agregados || 0}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Colaboradores</div>
+      </div>
+    </div>
+  `;
+}
+
+function mostrarActividades(){
+  const content = document.getElementById("perfil-content");
+  if(!actividades.length){
+    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Sin actividades aún</div>';
+  } else {
+    content.innerHTML = `
+      <div style="max-height:400px;overflow-y:auto;padding:16px 0">
+        ${actividades.map(a => `
+          <div style="border-bottom:1px solid var(--border);padding:12px 0;font-size:12px">
+            <div style="color:var(--green);font-weight:600">${a.accion.replace(/_/g, ' ').toUpperCase()}</div>
+            ${a.detalles ? `<div style="color:var(--muted);margin-top:4px">${a.detalles}</div>` : ''}
+            <div style="color:var(--muted);font-size:10px;margin-top:4px">${new Date(a.creada_en).toLocaleString()}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+}
+
+async function guardarNombre(){
+  const nombre = document.getElementById("edit_nombre").value.trim();
+  if(!nombre) return toast("Falta el nombre");
+  if(!validarNombre(nombre)) return toast("Nombre debe tener 2-100 caracteres");
+  await api("/api/perfil", {method:"PATCH", body:JSON.stringify({nombre})});
+  usuarioActual.nombre = nombre;
+  toast("Nombre actualizado");
+  renderPanel();
+  abrirPerfil();
+}
+
+function abrirCambiarContrasena(){
+  modal.innerHTML = `
+    <div class="modal">
+      <h2>🔐 Cambiar Contraseña</h2>
+      <label>Contraseña Actual</label>
+      <input type="password" id="pass_actual" placeholder="Tu contraseña actual">
+      <label>Nueva Contraseña</label>
+      <input type="password" id="pass_nueva" placeholder="Nueva contraseña (mín. 6)">
+      <label>Confirmar</label>
+      <input type="password" id="pass_confirm" placeholder="Confirmar contraseña">
+      <div class="modal-footer">
+        <button class="btn ghost" onclick="abrirPerfil()">Cancelar</button>
+        <button class="btn" onclick="cambiarContrasena()">Cambiar</button>
+      </div>
+    </div>
+  `;
+  modal.classList.add("open");
+}
+
+async function cambiarContrasena(){
+  const actual = document.getElementById("pass_actual").value;
+  const nueva = document.getElementById("pass_nueva").value;
+  const confirm = document.getElementById("pass_confirm").value;
+
+  if(!actual || !nueva || !confirm) return toast("Completa todos los campos");
+  if(!validarPassword(actual)) return toast("Contraseña actual inválida");
+  if(!validarPassword(nueva)) return toast("Nueva contraseña debe tener 6-128 caracteres");
+  if(nueva !== confirm) return toast("Las contraseñas no coinciden");
+  if(actual === nueva) return toast("La nueva contraseña debe ser diferente");
+
+  await api("/api/perfil/cambiar-contrasena", {method:"POST", body:JSON.stringify({passwordActual:actual, passwordNueva:nueva})});
+  toast("✅ Contraseña cambiada");
+  setTimeout(() => abrirPerfil(), 1500);
+}
+
 // ---------- ADMIN PANEL ----------
 let usuariosList = [];
 let invitacionesList = [];
@@ -472,6 +615,7 @@ function renderPanel(){
             <div style="font-size:11px">${usuarioActual.email} ${esAdmin ? '• 🔐 Admin' : ''}</div>
           </div>
         </div>
+        <button class="btn ghost small" onclick="abrirPerfil()">👤 Perfil</button>
         <button class="btn ghost small" onclick="abrirTutorial()">💡 Tutorial</button>
         <button class="btn ghost small" onclick="abrirColaboradores()">👥 Colaboradores</button>
         ${esAdmin ? '<button class="btn ghost small" onclick="abrirPanelAdmin()">⚙️ Admin</button>' : ''}

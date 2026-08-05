@@ -46,6 +46,17 @@ db.serialize(() => {
     )
   `);
   db.run(`
+    CREATE TABLE IF NOT EXISTS actividades (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+      accion TEXT NOT NULL,
+      detalles TEXT,
+      creada_en TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_actividades_usuario ON actividades(usuario_id, creada_en)`);
+});
+  db.run(`
     CREATE TABLE IF NOT EXISTS colaboradores (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -267,11 +278,83 @@ app.post("/api/setup-admin", (req, res) => {
   });
 });
 
+// Helper para registrar actividades
+function registrarActividad(userId, accion, detalles = "") {
+  db.run(
+    "INSERT INTO actividades (usuario_id, accion, detalles) VALUES (?,?,?)",
+    [userId, accion, detalles]
+  );
+}
+
 app.get("/api/me", auth, (req, res) => {
   db.get("SELECT id, email, nombre, rol FROM usuarios WHERE id=? AND activo=1", [req.userId], (err, user) => {
     if (!user) return res.status(401).json({ error: "Usuario inactivo" });
     res.json({ ...user, auth: true });
   });
+});
+
+app.patch("/api/perfil", auth, (req, res) => {
+  const { nombre } = req.body;
+  if (!nombre) return res.status(400).json({ error: "Falta el nombre" });
+  if (nombre.length < 2 || nombre.length > 100) return res.status(400).json({ error: "Nombre debe tener 2-100 caracteres" });
+
+  db.run(
+    "UPDATE usuarios SET nombre=? WHERE id=?",
+    [nombre, req.userId],
+    () => {
+      registrarActividad(req.userId, "perfil_actualizado", `Nombre: ${nombre}`);
+      db.get("SELECT id, email, nombre, rol FROM usuarios WHERE id=?", [req.userId], (err, user) => {
+        res.json(user);
+      });
+    }
+  );
+});
+
+app.post("/api/perfil/cambiar-contrasena", auth, (req, res) => {
+  const { passwordActual, passwordNueva } = req.body;
+  if (!passwordActual || !passwordNueva) return res.status(400).json({ error: "Faltan datos" });
+  if (passwordNueva.length < 6) return res.status(400).json({ error: "Contraseña mínimo 6 caracteres" });
+
+  const hashActual = hashPassword(passwordActual);
+  db.get("SELECT id FROM usuarios WHERE id=? AND password=?", [req.userId, hashActual], (err, user) => {
+    if (!user) return res.status(401).json({ error: "Contraseña actual incorrecta" });
+
+    const hashNueva = hashPassword(passwordNueva);
+    db.run(
+      "UPDATE usuarios SET password=? WHERE id=?",
+      [hashNueva, req.userId],
+      () => {
+        registrarActividad(req.userId, "contrasena_cambida");
+        res.json({ ok: true });
+      }
+    );
+  });
+});
+
+app.get("/api/actividades", auth, (req, res) => {
+  db.all(
+    "SELECT accion, detalles, creada_en FROM actividades WHERE usuario_id=? ORDER BY creada_en DESC LIMIT 50",
+    [req.userId],
+    (err, rows) => {
+      res.json(rows || []);
+    }
+  );
+});
+
+app.get("/api/estadisticas", auth, (req, res) => {
+  db.get(
+    `SELECT
+      (SELECT COUNT(*) FROM listas WHERE usuario_id=?) as nichos_totales,
+      (SELECT COUNT(*) FROM grupos WHERE lista_id IN (SELECT id FROM listas WHERE usuario_id=?)) as grupos_totales,
+      (SELECT COALESCE(SUM(clics), 0) FROM grupos WHERE lista_id IN (SELECT id FROM listas WHERE usuario_id=?)) as clics_totales,
+      (SELECT COUNT(*) FROM colaboradores WHERE usuario_id=?) as colaboradores_agregados
+    `,
+    [req.userId, req.userId, req.userId, req.userId],
+    (err, stats) => {
+      if (!stats) return res.json({ nichos_totales: 0, grupos_totales: 0, clics_totales: 0, colaboradores_agregados: 0 });
+      res.json(stats);
+    }
+  );
 });
 
 // ---------- ADMIN ROUTES ----------
