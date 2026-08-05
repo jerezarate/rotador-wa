@@ -23,6 +23,8 @@ db.serialize(() => {
       email TEXT NOT NULL UNIQUE,
       password TEXT NOT NULL,
       nombre TEXT NOT NULL,
+      rol TEXT DEFAULT 'user',
+      activo INTEGER DEFAULT 1,
       creado_en TEXT DEFAULT (datetime('now'))
     )
   `);
@@ -32,6 +34,15 @@ db.serialize(() => {
       usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
       creada_en TEXT DEFAULT (datetime('now')),
       expira_en TEXT
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS invitaciones (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      creada_por INTEGER NOT NULL REFERENCES usuarios(id),
+      creada_en TEXT DEFAULT (datetime('now')),
+      usada INTEGER DEFAULT 0
     )
   `);
   db.run(`
@@ -111,30 +122,41 @@ function auth(req, res, next) {
 
 // ---------- AUTH ROUTES ----------
 app.post("/api/register", (req, res) => {
-  const { email, password, nombre } = req.body;
+  const { email, password, nombre, invitacion } = req.body;
   if (!email || !password || !nombre)
     return res.status(400).json({ error: "Faltan datos" });
   if (password.length < 6)
     return res.status(400).json({ error: "Contraseña mínimo 6 caracteres" });
 
-  const hash = hashPassword(password);
-  db.run(
-    "INSERT INTO usuarios (email, password, nombre) VALUES (?,?,?)",
-    [email, hash, nombre],
-    function (err) {
-      if (err)
-        return res.status(400).json({ error: "Email ya registrado" });
+  // Verificar invitación
+  if (invitacion) {
+    db.get("SELECT * FROM invitaciones WHERE id=? AND email=? AND usada=0", [invitacion, email], (err, inv) => {
+      if (err || !inv) return res.status(400).json({ error: "Invitación inválida o expirada" });
 
-      generateSession(this.lastID, (err, sid) => {
-        res.cookie("sid", sid, {
-          httpOnly: true,
-          sameSite: "lax",
-          maxAge: 1000 * 60 * 60 * 24 * 30,
-        });
-        res.json({ ok: true });
-      });
-    }
-  );
+      const hash = hashPassword(password);
+      db.run(
+        "INSERT INTO usuarios (email, password, nombre, rol) VALUES (?,?,?,?)",
+        [email, hash, nombre, "user"],
+        function (err) {
+          if (err) return res.status(400).json({ error: "Email ya registrado" });
+
+          // Marcar invitación como usada
+          db.run("UPDATE invitaciones SET usada=1 WHERE id=?", [invitacion]);
+
+          generateSession(this.lastID, (err, sid) => {
+            res.cookie("sid", sid, {
+              httpOnly: true,
+              sameSite: "lax",
+              maxAge: 1000 * 60 * 60 * 24 * 30,
+            });
+            res.json({ ok: true });
+          });
+        }
+      );
+    });
+  } else {
+    return res.status(400).json({ error: "Se requiere invitación para registrarse" });
+  }
 });
 
 app.post("/api/login", (req, res) => {
@@ -185,8 +207,73 @@ app.post("/api/reset-password", (req, res) => {
 });
 
 app.get("/api/me", auth, (req, res) => {
-  db.get("SELECT id, email, nombre FROM usuarios WHERE id=?", [req.userId], (err, user) => {
+  db.get("SELECT id, email, nombre, rol FROM usuarios WHERE id=? AND activo=1", [req.userId], (err, user) => {
+    if (!user) return res.status(401).json({ error: "Usuario inactivo" });
     res.json({ ...user, auth: true });
+  });
+});
+
+// ---------- ADMIN ROUTES ----------
+function adminAuth(req, res, next) {
+  auth(req, res, () => {
+    db.get("SELECT rol FROM usuarios WHERE id=?", [req.userId], (err, user) => {
+      if (err || !user || user.rol !== "admin") {
+        return res.status(403).json({ error: "Se requieren permisos de admin" });
+      }
+      next();
+    });
+  });
+}
+
+app.get("/api/admin/usuarios", adminAuth, (req, res) => {
+  db.all("SELECT id, email, nombre, rol, activo, creado_en FROM usuarios ORDER BY creado_en DESC", (err, users) => {
+    res.json(users || []);
+  });
+});
+
+app.post("/api/admin/invitaciones", adminAuth, (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Falta email" });
+
+  const id = crypto.randomBytes(16).toString("hex");
+  db.run(
+    "INSERT INTO invitaciones (id, email, creada_por) VALUES (?,?,?)",
+    [id, email, req.userId],
+    (err) => {
+      if (err) return res.status(400).json({ error: "Email ya tiene invitación" });
+      res.json({ id, email });
+    }
+  );
+});
+
+app.get("/api/admin/invitaciones", adminAuth, (req, res) => {
+  db.all(
+    "SELECT id, email, creada_en, usada FROM invitaciones ORDER BY creada_en DESC",
+    (err, rows) => {
+      res.json(rows || []);
+    }
+  );
+});
+
+app.patch("/api/admin/usuarios/:id", adminAuth, (req, res) => {
+  const { rol, activo } = req.body;
+  if (req.params.id == req.userId) return res.status(400).json({ error: "No puedes modificarte a ti mismo" });
+
+  let updates = [];
+  if (rol) updates.push(() => db.run("UPDATE usuarios SET rol=? WHERE id=?", [rol, req.params.id]));
+  if (activo !== undefined) updates.push(() => db.run("UPDATE usuarios SET activo=? WHERE id=?", [activo ? 1 : 0, req.params.id]));
+
+  if (!updates.length) return res.json({ ok: true });
+
+  let done = 0;
+  updates.forEach((u) => {
+    u();
+    done++;
+    if (done === updates.length) {
+      db.get("SELECT id, email, nombre, rol, activo FROM usuarios WHERE id=?", [req.params.id], (err, user) => {
+        res.json(user);
+      });
+    }
   });
 });
 
