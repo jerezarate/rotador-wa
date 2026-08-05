@@ -355,48 +355,60 @@ app.delete("/api/listas/:id", auth, (req, res) => {
 
 // ---------- API GRUPOS ----------
 app.post("/api/listas/:id/grupos", auth, (req, res) => {
-  db.get("SELECT * FROM listas WHERE id=? AND usuario_id=?", [req.params.id, req.userId], (err, lista) => {
-    if (err || !lista) return res.status(404).json({ error: "Lista no encontrada" });
+  // Verificar que sea propietario O colaborador
+  db.get(
+    `SELECT l.* FROM listas l
+     LEFT JOIN colaboradores c ON l.usuario_id = c.usuario_id
+     WHERE l.id=? AND (l.usuario_id=? OR c.colaborador_id=?)`,
+    [req.params.id, req.userId, req.userId],
+    (err, lista) => {
+      if (err || !lista) return res.status(404).json({ error: "Lista no encontrada" });
 
-    const texto = req.body.urls || "";
-    const urls = texto
-      .split(/\n|,/)
-      .map((s) => s.trim())
-      .filter((s) => s.startsWith("http"));
-    if (!urls.length) return res.status(400).json({ error: "Pegá al menos un link válido" });
+      // Solo propietario puede agregar grupos
+      if (lista.usuario_id !== req.userId) return res.status(403).json({ error: "Sin permisos para agregar grupos" });
 
-    db.get("SELECT COALESCE(MAX(posicion),0) m FROM grupos WHERE lista_id=?", [lista.id], (err, row) => {
-      const max = row.m;
-      let inserted = 0;
+      const texto = req.body.urls || "";
+      const urls = texto
+        .split(/\n|,/)
+        .map((s) => s.trim())
+        .filter((s) => s.startsWith("http"));
+      if (!urls.length) return res.status(400).json({ error: "Pegá al menos un link válido" });
 
-      urls.forEach((u, i) => {
-        const n = max + i + 1;
-        db.run(
-          "INSERT INTO grupos (lista_id, url, etiqueta, posicion) VALUES (?,?,?,?)",
-          [lista.id, u, `Grupo ${n}`, n],
-          () => {
-            inserted++;
-            if (inserted === urls.length) {
-              normalizarEstados(lista.id, () => {
-                listaConGrupos(lista, (err, result) => {
-                  res.json(result);
+      db.get("SELECT COALESCE(MAX(posicion),0) m FROM grupos WHERE lista_id=?", [lista.id], (err, row) => {
+        const max = row.m;
+        let inserted = 0;
+
+        urls.forEach((u, i) => {
+          const n = max + i + 1;
+          db.run(
+            "INSERT INTO grupos (lista_id, url, etiqueta, posicion) VALUES (?,?,?,?)",
+            [lista.id, u, `Grupo ${n}`, n],
+            () => {
+              inserted++;
+              if (inserted === urls.length) {
+                normalizarEstados(lista.id, () => {
+                  listaConGrupos(lista, (err, result) => {
+                    res.json(result);
+                  });
                 });
-              });
+              }
             }
-          }
-        );
+          );
+        });
       });
-    });
-  });
+    }
+  );
 });
 
 app.patch("/api/grupos/:id", auth, (req, res) => {
   db.get(
-    "SELECT g.*, l.usuario_id FROM grupos g JOIN listas l ON g.lista_id=l.id WHERE g.id=?",
-    [req.params.id],
+    `SELECT g.*, l.usuario_id, l.id as lista_id FROM grupos g
+     JOIN listas l ON g.lista_id=l.id
+     LEFT JOIN colaboradores c ON l.usuario_id = c.usuario_id
+     WHERE g.id=? AND (l.usuario_id=? OR c.colaborador_id=?)`,
+    [req.params.id, req.userId, req.userId],
     (err, g) => {
-      if (err || !g || g.usuario_id !== req.userId)
-        return res.status(404).json({ error: "Grupo no encontrado" });
+      if (err || !g) return res.status(404).json({ error: "Grupo no encontrado" });
 
       const { accion, url, etiqueta } = req.body;
       let updates = [];
@@ -440,8 +452,11 @@ app.delete("/api/grupos/:id", auth, (req, res) => {
     "SELECT g.*, l.usuario_id FROM grupos g JOIN listas l ON g.lista_id=l.id WHERE g.id=?",
     [req.params.id],
     (err, g) => {
-      if (err || !g || g.usuario_id !== req.userId)
-        return res.status(404).json({ error: "Grupo no encontrado" });
+      if (err || !g) return res.status(404).json({ error: "Grupo no encontrado" });
+
+      // Solo propietario puede borrar grupos
+      if (g.usuario_id !== req.userId) return res.status(403).json({ error: "Sin permisos para borrar" });
+
       db.run("DELETE FROM grupos WHERE id=?", [req.params.id], () => {
         normalizarEstados(g.lista_id, () => {
           db.get("SELECT * FROM listas WHERE id=?", [g.lista_id], (err, l) => {
