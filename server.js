@@ -116,12 +116,17 @@ function checkRateLimit(email) {
   return attempts.count > 5; // Max 5 intentos por minuto
 }
 
-// Headers de seguridad
+// Headers de seguridad y privacidad
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+
+  // Bloquear indexación por buscadores
+  res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive, nositelinkssearchbox, notranslate, noimageindex");
+  res.setHeader("X-UA-Compatible", "IE=edge");
+
   next();
 });
 
@@ -724,6 +729,8 @@ app.delete("/api/grupos/:id", auth, (req, res) => {
 });
 
 // ---------- PANEL ----------
+app.get("/robots.txt", (req, res) => res.sendFile(path.join(__dirname, "robots.txt")));
+
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "panel.html")));
 
 app.listen(PORT, () => console.log(`Rotador corriendo en puerto ${PORT}`));
