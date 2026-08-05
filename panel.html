@@ -159,11 +159,44 @@ const tutorialSteps = [
 async function api(url, opts={}){
   const r = await fetch(url,{headers:{"Content-Type":"application/json"},...opts});
   const d = await r.json().catch(()=>({}));
-  if(!r.ok){ toast(d.error||"Error"); throw new Error(d.error); }
+
+  if(!r.ok){
+    // Si sesión expiró, logout
+    if(r.status === 401 || r.status === 403){
+      setTimeout(() => {
+        logout();
+      }, 1000);
+    }
+    toast(d.error||"Error");
+    throw new Error(d.error);
+  }
   return d;
 }
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); }
 function copiar(txt){ navigator.clipboard.writeText(txt); toast("Copiado"); }
+
+// Validación de inputs
+function validarEmail(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
+function validarNombre(nombre) {
+  return nombre.length >= 2 && nombre.length <= 100;
+}
+
+function validarPassword(password) {
+  return password.length >= 6 && password.length <= 128;
+}
+
+function validarURL(url) {
+  try {
+    new URL(url);
+    return url.startsWith("http://") || url.startsWith("https://");
+  } catch {
+    return false;
+  }
+}
 
 // ---------- TUTORIAL ----------
 function renderTutorialStep(){
@@ -264,6 +297,8 @@ async function login(){
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
   if(!email || !password) return toast("Completa los campos");
+  if(!validarEmail(email)) return toast("Email inválido");
+  if(!validarPassword(password)) return toast("Contraseña inválida");
   await api("/api/login",{method:"POST",body:JSON.stringify({email,password})});
   cargar();
 }
@@ -272,9 +307,14 @@ async function register(){
   const nombre = document.getElementById("nombre").value.trim();
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
-  if(!nombre || !email || !password) return toast("Completa todos los campos");
-  if(password.length < 6) return toast("Contraseña mínimo 6 caracteres");
-  await api("/api/register",{method:"POST",body:JSON.stringify({nombre,email,password})});
+  const invitacion = document.getElementById("invitacion")?.value.trim() || "";
+
+  if(!nombre || !email || !password || !invitacion) return toast("Completa todos los campos");
+  if(!validarNombre(nombre)) return toast("Nombre debe tener 2-100 caracteres");
+  if(!validarEmail(email)) return toast("Email inválido");
+  if(!validarPassword(password)) return toast("Contraseña debe tener 6-128 caracteres");
+
+  await api("/api/register",{method:"POST",body:JSON.stringify({nombre,email,password,invitacion})});
   cargar();
 }
 
@@ -284,7 +324,8 @@ async function resetPassword(){
   const confirm = document.getElementById("reset_password_confirm").value;
 
   if(!email || !password || !confirm) return toast("Completa todos los campos");
-  if(password.length < 6) return toast("Contraseña mínimo 6 caracteres");
+  if(!validarEmail(email)) return toast("Email inválido");
+  if(!validarPassword(password)) return toast("Contraseña debe tener 6-128 caracteres");
   if(password !== confirm) return toast("Las contraseñas no coinciden");
 
   await api("/api/reset-password",{method:"POST",body:JSON.stringify({email,newPassword:password})});
@@ -584,8 +625,13 @@ function abrirModalNicho(){
 
 async function crearNicho(){
   const nombre = document.getElementById("nombre_nicho").value.trim();
+  const fallback = document.getElementById("fallback").value.trim();
+
   if(!nombre) return toast("Falta el nombre");
-  await api("/api/listas",{method:"POST",body:JSON.stringify({nombre,fallback_url:document.getElementById("fallback").value})});
+  if(!validarNombre(nombre)) return toast("Nombre debe tener 2-100 caracteres");
+  if(fallback && !validarURL(fallback)) return toast("URL fallback inválida");
+
+  await api("/api/listas",{method:"POST",body:JSON.stringify({nombre,fallback_url:fallback})});
   nichos = await api("/api/listas");
   renderPanel();
   modal.classList.remove("open");
@@ -645,6 +691,16 @@ function abrirModalGrupos(lista_id){
 async function agregarGrupos(lista_id){
   const urls = document.getElementById("urls_grupos").value.trim();
   if(!urls) return toast("Pega al menos un link");
+
+  // Validar que al menos haya URLs válidas
+  const urlList = urls.split(/\n|,/).map(s => s.trim()).filter(s => s.startsWith("http"));
+  if(!urlList.length) return toast("Pega links válidos de WhatsApp");
+
+  // Validar que todas sean URLs válidas
+  for(let url of urlList) {
+    if(!validarURL(url)) return toast(`URL inválida: ${url}`);
+  }
+
   await api(`/api/listas/${lista_id}/grupos`,{method:"POST",body:JSON.stringify({urls})});
   nichos = await api("/api/listas");
   renderPanel();
