@@ -710,7 +710,62 @@ async function logout(){
 }
 
 // INIT
-cargar();
+(async () => {
+  try {
+    const me = await api("/api/me");
+    cargar();
+  } catch(e) {
+    // Verificar si es primer setup
+    try {
+      const res = await fetch("/api/admin/usuarios");
+      if (res.status === 403) {
+        // No hay admin, mostrar setup
+        mostrarSetupAdmin();
+      } else {
+        renderLogin();
+      }
+    } catch {
+      renderLogin();
+    }
+  }
+})();
+
+function mostrarSetupAdmin(){
+  app.innerHTML = `
+    <div class="auth-form" style="max-width:450px">
+      <h1 style="color:var(--green);font-size:28px;margin-bottom:8px">🔐 Setup Admin</h1>
+      <p class="subtitle">Primera vez en Railway - Crea tu cuenta de admin</p>
+      <div id="setupContent"></div>
+    </div>
+  `;
+
+  document.getElementById("setupContent").innerHTML = `
+    <input type="text" id="admin_nombre" placeholder="Tu nombre" autofocus>
+    <input type="email" id="admin_email" placeholder="tu@email.com">
+    <input type="password" id="admin_password" placeholder="Contraseña (mín. 6 caracteres)">
+    <input type="password" id="admin_password_confirm" placeholder="Confirmar contraseña">
+    <button class="btn" onclick="crearAdminSetup()" style="width:100%">Crear Admin</button>
+  `;
+  document.getElementById("admin_nombre").addEventListener("keydown", e => { if(e.key==="Enter") crearAdminSetup(); });
+}
+
+async function crearAdminSetup(){
+  const nombre = document.getElementById("admin_nombre").value.trim();
+  const email = document.getElementById("admin_email").value.trim();
+  const password = document.getElementById("admin_password").value;
+  const confirm = document.getElementById("admin_password_confirm").value;
+
+  if(!nombre || !email || !password || !confirm) return toast("Completa todos los campos");
+  if(password.length < 6) return toast("Contraseña mínimo 6 caracteres");
+  if(password !== confirm) return toast("Las contraseñas no coinciden");
+
+  await api("/api/setup-admin", {method:"POST", body:JSON.stringify({nombre, email, password})});
+  toast("✅ Admin creado");
+  setTimeout(() => {
+    renderLogin();
+    mostrarLogin();
+  }, 1000);
+}
 </script>
 </body>
 </html>

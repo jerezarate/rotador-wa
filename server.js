@@ -206,6 +206,27 @@ app.post("/api/reset-password", (req, res) => {
   });
 });
 
+app.post("/api/setup-admin", (req, res) => {
+  const { email, password, nombre } = req.body;
+  if (!email || !password || !nombre) return res.status(400).json({ error: "Faltan datos" });
+  if (password.length < 6) return res.status(400).json({ error: "Contraseña mínimo 6 caracteres" });
+
+  // Verificar que no exista admin ya
+  db.get("SELECT id FROM usuarios WHERE rol='admin'", (err, admin) => {
+    if (admin) return res.status(400).json({ error: "Ya existe un admin registrado" });
+
+    const hash = hashPassword(password);
+    db.run(
+      "INSERT INTO usuarios (email, password, nombre, rol, activo) VALUES (?,?,?,?,?)",
+      [email, hash, nombre, "admin", 1],
+      function (err) {
+        if (err) return res.status(400).json({ error: "Email ya registrado" });
+        res.json({ ok: true, message: "✅ Admin creado. Puedes loguearte ahora." });
+      }
+    );
+  });
+});
+
 app.get("/api/me", auth, (req, res) => {
   db.get("SELECT id, email, nombre, rol FROM usuarios WHERE id=? AND activo=1", [req.userId], (err, user) => {
     if (!user) return res.status(401).json({ error: "Usuario inactivo" });
