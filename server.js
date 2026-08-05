@@ -85,8 +85,34 @@ db.serialize(() => {
 });
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "1mb" })); // Limitar tamaño de requests
 app.use(cookieParser());
+
+// Rate limiting simple para prevenir fuerza bruta
+const loginAttempts = new Map();
+function checkRateLimit(email) {
+  const key = `login_${email}`;
+  const attempts = loginAttempts.get(key) || { count: 0, resetTime: Date.now() + 60000 };
+
+  if (Date.now() > attempts.resetTime) {
+    attempts.count = 0;
+    attempts.resetTime = Date.now() + 60000;
+  }
+
+  attempts.count++;
+  loginAttempts.set(key, attempts);
+
+  return attempts.count > 5; // Max 5 intentos por minuto
+}
+
+// Headers de seguridad
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  next();
+});
 
 // Hash password
 function hashPassword(pwd) {
@@ -104,16 +130,21 @@ function generateSession(userId, callback) {
   );
 }
 
-// Auth middleware
+// Auth middleware - Verificar sesión válida y usuario activo
 function auth(req, res, next) {
   const sid = req.cookies.sid;
   if (!sid) return res.status(401).json({ error: "No autorizado" });
 
   db.get(
-    "SELECT usuario_id FROM sesiones WHERE id=? AND datetime(expira_en) > datetime('now')",
+    `SELECT s.usuario_id FROM sesiones s
+     JOIN usuarios u ON s.usuario_id = u.id
+     WHERE s.id=? AND datetime(s.expira_en) > datetime('now') AND u.activo=1`,
     [sid],
     (err, row) => {
-      if (err || !row) return res.status(401).json({ error: "Sesión expirada" });
+      if (err || !row) {
+        res.clearCookie("sid");
+        return res.status(401).json({ error: "Sesión expirada o usuario inactivo" });
+      }
       req.userId = row.usuario_id;
       next();
     }
@@ -163,13 +194,22 @@ app.post("/api/login", (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: "Faltan datos" });
 
+  // Rate limiting: prevenir fuerza bruta
+  if (checkRateLimit(email)) {
+    return res.status(429).json({ error: "Demasiados intentos. Intenta en 1 minuto." });
+  }
+
   const hash = hashPassword(password);
   db.get(
-    "SELECT id FROM usuarios WHERE email=? AND password=?",
+    "SELECT id, activo FROM usuarios WHERE email=? AND password=?",
     [email, hash],
     (err, user) => {
       if (err || !user)
         return res.status(401).json({ error: "Email o contraseña incorrectos" });
+
+      // Verificar que el usuario esté activo
+      if (!user.activo)
+        return res.status(403).json({ error: "Usuario inactivo. Contacta al admin." });
 
       generateSession(user.id, (err, sid) => {
         res.cookie("sid", sid, {
@@ -448,8 +488,12 @@ app.post("/api/listas", auth, (req, res) => {
 
 app.patch("/api/listas/:id", auth, (req, res) => {
   const { nombre, umbral, fallback_url } = req.body;
-  db.get("SELECT * FROM listas WHERE id=? AND usuario_id=?", [req.params.id, req.userId], (err, l) => {
+
+  // Solo el propietario puede editar
+  db.get("SELECT * FROM listas WHERE id=?", [req.params.id], (err, l) => {
     if (err || !l) return res.status(404).json({ error: "Lista no encontrada" });
+    if (l.usuario_id !== req.userId) return res.status(403).json({ error: "Sin permisos para editar" });
+
     db.run(
       "UPDATE listas SET nombre=?, umbral=?, fallback_url=? WHERE id=?",
       [nombre ?? l.nombre, parseInt(umbral) || l.umbral, fallback_url ?? l.fallback_url, l.id],
@@ -467,8 +511,10 @@ app.patch("/api/listas/:id", auth, (req, res) => {
 });
 
 app.delete("/api/listas/:id", auth, (req, res) => {
-  db.get("SELECT id FROM listas WHERE id=? AND usuario_id=?", [req.params.id, req.userId], (err, l) => {
-    if (!l) return res.status(404).json({ error: "Lista no encontrada" });
+  db.get("SELECT usuario_id FROM listas WHERE id=?", [req.params.id], (err, l) => {
+    if (err || !l) return res.status(404).json({ error: "Lista no encontrada" });
+    if (l.usuario_id !== req.userId) return res.status(403).json({ error: "Sin permisos para borrar" });
+
     db.run("DELETE FROM grupos WHERE lista_id=?", [req.params.id], () => {
       db.run("DELETE FROM listas WHERE id=?", [req.params.id], () => {
         res.json({ ok: true });
