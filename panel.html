@@ -231,8 +231,21 @@ function mostrarLogin(){
     <input type="password" id="password" placeholder="Contraseña">
     <button class="btn" onclick="login()" style="width:100%">Entrar</button>
     <div class="toggle">¿No tenés cuenta? <a onclick="mostrarRegistro()">Crear una</a></div>
+    <div class="toggle" style="margin-top:12px">¿Olvidaste tu contraseña? <a onclick="mostrarResetPassword()">Recuperar</a></div>
   `;
   document.getElementById("email").addEventListener("keydown", e => { if(e.key==="Enter") login(); });
+}
+
+function mostrarResetPassword(){
+  document.getElementById("subtitle").textContent = "Recuperar contraseña";
+  document.getElementById("formContent").innerHTML = `
+    <input type="email" id="reset_email" placeholder="Tu email" autofocus>
+    <input type="password" id="reset_password" placeholder="Nueva contraseña (mín. 6 caracteres)">
+    <input type="password" id="reset_password_confirm" placeholder="Confirmar contraseña">
+    <button class="btn" onclick="resetPassword()" style="width:100%">Cambiar Contraseña</button>
+    <div class="toggle">¿Recordaste? <a onclick="mostrarLogin()">Volver a Entrar</a></div>
+  `;
+  document.getElementById("reset_email").addEventListener("keydown", e => { if(e.key==="Enter") resetPassword(); });
 }
 
 function mostrarRegistro(){
@@ -263,6 +276,20 @@ async function register(){
   if(password.length < 6) return toast("Contraseña mínimo 6 caracteres");
   await api("/api/register",{method:"POST",body:JSON.stringify({nombre,email,password})});
   cargar();
+}
+
+async function resetPassword(){
+  const email = document.getElementById("reset_email").value.trim();
+  const password = document.getElementById("reset_password").value;
+  const confirm = document.getElementById("reset_password_confirm").value;
+
+  if(!email || !password || !confirm) return toast("Completa todos los campos");
+  if(password.length < 6) return toast("Contraseña mínimo 6 caracteres");
+  if(password !== confirm) return toast("Las contraseñas no coinciden");
+
+  await api("/api/reset-password",{method:"POST",body:JSON.stringify({email,newPassword:password})});
+  toast("Contraseña actualizada ✅");
+  setTimeout(() => mostrarLogin(), 1500);
 }
 
 // ---------- MAIN ----------

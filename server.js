@@ -168,6 +168,22 @@ app.post("/api/logout", (req, res) => {
   res.json({ ok: true });
 });
 
+app.post("/api/reset-password", (req, res) => {
+  const { email, newPassword } = req.body;
+  if (!email || !newPassword) return res.status(400).json({ error: "Faltan datos" });
+  if (newPassword.length < 6) return res.status(400).json({ error: "Contraseña mínimo 6 caracteres" });
+
+  db.get("SELECT id FROM usuarios WHERE email=?", [email], (err, user) => {
+    if (err || !user) return res.status(404).json({ error: "Email no encontrado" });
+
+    const hash = hashPassword(newPassword);
+    db.run("UPDATE usuarios SET password=? WHERE id=?", [hash, user.id], (err) => {
+      if (err) return res.status(400).json({ error: "Error al actualizar contraseña" });
+      res.json({ ok: true });
+    });
+  });
+});
+
 app.get("/api/me", auth, (req, res) => {
   db.get("SELECT id, email, nombre FROM usuarios WHERE id=?", [req.userId], (err, user) => {
     res.json({ ...user, auth: true });
