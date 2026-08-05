@@ -292,6 +292,111 @@ async function resetPassword(){
   setTimeout(() => mostrarLogin(), 1500);
 }
 
+// ---------- ADMIN PANEL ----------
+let usuariosList = [];
+let invitacionesList = [];
+
+async function abrirPanelAdmin(){
+  modal.innerHTML = `
+    <div class="modal" style="max-width:800px">
+      <h2>⚙️ Panel Admin</h2>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('usuarios', this)">Usuarios</button>
+        <button class="tab-btn" onclick="switchTab('invitaciones', this)">Invitaciones</button>
+      </div>
+      <div id="tab-content"></div>
+    </div>
+  `;
+  modal.classList.add("open");
+  await cargarUsuarios();
+}
+
+function switchTab(tab, btn){
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  if(tab === "usuarios") cargarUsuarios();
+  else cargarInvitaciones();
+}
+
+async function cargarUsuarios(){
+  try {
+    usuariosList = await api("/api/admin/usuarios");
+    const content = document.getElementById("tab-content");
+    content.innerHTML = `
+      <div style="max-height:400px;overflow-y:auto">
+        ${usuariosList.map(u => `
+          <div class="colab-item">
+            <div>
+              <div class="colab-email">${u.email}</div>
+              <div class="colab-nombre">${u.nombre} • ${u.rol.toUpperCase()}</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:4px">${u.activo ? '🟢 Activo' : '🔴 Inactivo'}</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-direction:column">
+              <select onchange="cambiarRol('${u.id}', this.value)" style="background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:11px">
+                <option value="user" ${u.rol === 'user' ? 'selected' : ''}>Usuario</option>
+                <option value="admin" ${u.rol === 'admin' ? 'selected' : ''}>Admin</option>
+              </select>
+              <button class="btn small ${u.activo ? 'danger' : 'ghost'}" onclick="toggleUsuario('${u.id}', ${u.activo})">
+                ${u.activo ? 'Desactivar' : 'Activar'}
+              </button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch(e) {}
+}
+
+async function cargarInvitaciones(){
+  try {
+    invitacionesList = await api("/api/admin/invitaciones");
+    const content = document.getElementById("tab-content");
+    content.innerHTML = `
+      <div style="margin-bottom:16px">
+        <label>Invitar nuevo usuario</label>
+        <div style="display:flex;gap:8px">
+          <input type="email" id="email_invitar" placeholder="correo@ejemplo.com">
+          <button class="btn small" onclick="crearInvitacion()">Enviar Invitación</button>
+        </div>
+      </div>
+      <div style="max-height:300px;overflow-y:auto;border-top:1px solid var(--border);padding-top:16px">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Comparte el código con el usuario para que se registre</p>
+        ${invitacionesList.map(inv => `
+          <div class="colab-item">
+            <div>
+              <div class="colab-email">${inv.email}</div>
+              <div class="colab-nombre" style="font-family:var(--mono);font-size:11px">${inv.id}</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:4px">${inv.usada ? '✅ Usada' : '⏳ Pendiente'}</div>
+            </div>
+            <button class="btn small ghost" onclick="copiar('${inv.id}')">Copiar</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch(e) {}
+}
+
+async function crearInvitacion(){
+  const email = document.getElementById("email_invitar").value.trim();
+  if(!email) return toast("Ingresa un email");
+  await api("/api/admin/invitaciones", {method:"POST", body:JSON.stringify({email})});
+  toast("Invitación creada");
+  await cargarInvitaciones();
+  document.getElementById("email_invitar").value = "";
+}
+
+async function cambiarRol(userId, nuevoRol){
+  await api(`/api/admin/usuarios/${userId}`, {method:"PATCH", body:JSON.stringify({rol:nuevoRol})});
+  toast("Rol actualizado");
+  await cargarUsuarios();
+}
+
+async function toggleUsuario(userId, actualmentActivo){
+  await api(`/api/admin/usuarios/${userId}`, {method:"PATCH", body:JSON.stringify({activo:!actualmentActivo})});
+  toast(actualmentActivo ? "Usuario desactivado" : "Usuario activado");
+  await cargarUsuarios();
+}
+
 // ---------- MAIN ----------
 async function cargar(){
   try {
@@ -307,6 +412,7 @@ async function cargar(){
 
 function renderPanel(){
   const initial = usuarioActual.nombre.charAt(0).toUpperCase();
+  const esAdmin = usuarioActual.rol === "admin";
 
   // Detectar qué nichos es propietario vs colaborador
   esColaborador = {};
@@ -322,11 +428,12 @@ function renderPanel(){
           <div class="user-avatar">${initial}</div>
           <div>
             <div>${usuarioActual.nombre}</div>
-            <div style="font-size:11px">${usuarioActual.email}</div>
+            <div style="font-size:11px">${usuarioActual.email} ${esAdmin ? '• 🔐 Admin' : ''}</div>
           </div>
         </div>
         <button class="btn ghost small" onclick="abrirTutorial()">💡 Tutorial</button>
         <button class="btn ghost small" onclick="abrirColaboradores()">👥 Colaboradores</button>
+        ${esAdmin ? '<button class="btn ghost small" onclick="abrirPanelAdmin()">⚙️ Admin</button>' : ''}
         <button class="btn small" onclick="logout()">Salir</button>
       </div>
     </header>
