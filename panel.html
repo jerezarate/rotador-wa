@@ -86,7 +86,9 @@
 
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
   .modal-bg.open{display:flex}
-  .modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;position:relative}
+  .modal-close{position:absolute;top:12px;right:12px;background:transparent;border:none;color:var(--muted);font-size:24px;cursor:pointer;padding:4px 8px;transition:all .2s}
+  .modal-close:hover{color:var(--text);transform:scale(1.1)}
   .modal h2{font-size:18px;margin-bottom:4px;color:var(--text)}
   .modal p{color:var(--muted);font-size:13px;margin-bottom:16px}
   .modal label{display:block;color:var(--muted);font-size:12px;margin:14px 0 6px;font-weight:600;text-transform:uppercase}
@@ -178,6 +180,7 @@ async function api(url, opts={}){
 }
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800); }
 function copiar(txt){ navigator.clipboard.writeText(txt); toast("Copiado"); }
+function cerrarModal(){ modal.classList.remove("open"); }
 
 // Validación de inputs
 function validarEmail(email) {
@@ -210,6 +213,7 @@ function renderTutorialStep(){
   ).join('');
   tutorial.innerHTML = `
     <div class="tutorial-slide">
+      <button class="modal-close" onclick="closeTutorial()" style="position:absolute;top:12px;right:12px;z-index:10">✕</button>
       <div class="step-number">Paso ${tutorialStep + 1} de ${tutorialSteps.length}</div>
       <div class="icon">${step.icon}</div>
       <h2>${step.title}</h2>
@@ -347,6 +351,7 @@ async function abrirPerfil(){
 
   modal.innerHTML = `
     <div class="modal" style="max-width:700px">
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
       <h2>👤 Mi Perfil</h2>
       <div class="tabs">
         <button class="tab-btn active" onclick="switchPerfil('datos', this)">Datos</button>
@@ -448,6 +453,7 @@ async function guardarNombre(){
 function abrirCambiarContrasena(){
   modal.innerHTML = `
     <div class="modal">
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
       <h2>🔐 Cambiar Contraseña</h2>
       <label>Contraseña Actual</label>
       <input type="password" id="pass_actual" placeholder="Tu contraseña actual">
@@ -487,6 +493,7 @@ let invitacionesList = [];
 async function abrirPanelAdmin(){
   modal.innerHTML = `
     <div class="modal" style="max-width:800px">
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
       <h2>⚙️ Panel Admin</h2>
       <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('usuarios', this)">Usuarios</button>
@@ -755,6 +762,7 @@ async function borrarGrupo(id){
 function abrirModalNicho(){
   modal.innerHTML = `
     <div class="modal">
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
       <h2>Crear Nicho</h2>
       <p>Ej: dinero, bajar de peso, recetas</p>
       <label>Nombre</label>
@@ -789,6 +797,7 @@ function editarNicho(id){
   const n = nichos.find(x=>x.id===id);
   modal.innerHTML = `
     <div class="modal">
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
       <h2>Editar ${n.nombre}</h2>
       <label>Nombre</label>
       <input type="text" id="edit_nombre" value="${n.nombre}">
@@ -822,6 +831,7 @@ async function borrarNicho(id){
 function abrirModalGrupos(lista_id){
   modal.innerHTML = `
     <div class="modal">
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
       <h2>Agregar Grupos</h2>
       <p>Pega los links de WhatsApp (uno por línea)</p>
       <label>Links</label>
@@ -859,6 +869,7 @@ async function agregarGrupos(lista_id){
 function abrirColaboradores(){
   modal.innerHTML = `
     <div class="modal">
+      <button class="modal-close" onclick="cerrarModal()">✕</button>
       <h2>👥 Colaboradores</h2>
       <p>Gestiona quién tiene acceso a tus nichos</p>
       <div class="colaboradores-list" id="colab_list"></div>
