@@ -282,6 +282,33 @@ app.post("/api/setup-admin", (req, res) => {
   });
 });
 
+app.post("/api/init-admin-direct", (req, res) => {
+  // Solo funciona si no hay NINGUN usuario
+  db.get("SELECT COUNT(*) as count FROM usuarios", (err, row) => {
+    if (row.count > 0) return res.status(400).json({ error: "Ya hay usuarios registrados" });
+
+    const email = "jeremias.zarate04@gmail.com";
+    const password = crypto.randomBytes(8).toString("hex");
+    const nombre = "Jeremias Admin";
+    const hash = hashPassword(password);
+
+    db.run(
+      "INSERT INTO usuarios (email, password, nombre, rol, activo) VALUES (?,?,?,?,?)",
+      [email, hash, nombre, "admin", 1],
+      function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({
+          ok: true,
+          email: email,
+          password: password,
+          nombre: nombre,
+          message: "✅ Admin creado exitosamente"
+        });
+      }
+    );
+  });
+});
+
 // Helper para registrar actividades
 function registrarActividad(userId, accion, detalles = "") {
   db.run(
