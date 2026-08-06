@@ -55,7 +55,6 @@ db.serialize(() => {
     )
   `);
   db.run(`CREATE INDEX IF NOT EXISTS idx_actividades_usuario ON actividades(usuario_id, creada_en)`);
-});
   db.run(`
     CREATE TABLE IF NOT EXISTS colaboradores (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
