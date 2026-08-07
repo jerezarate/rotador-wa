@@ -753,7 +753,7 @@ function renderNicho(n){
           </div>
           <div class="grupo-acciones">
             <button class="btn small" onclick="sumarClics(${g.id}, ${n.id})">➕ +1 Clic</button>
-            <button class="btn small ghost" onclick="accionGrupo(${g.id},'${g.estado === 'lleno' ? 'reabrir' : 'lleno'}')">
+            <button class="btn small ghost" onclick="accionGrupo(${g.id},'${g.estado==='lleno'?'reabrir':'lleno'}')">
               ${g.estado === 'lleno' ? '🔄 Reabrir' : '🔴 Llenar'}
             </button>
             <button class="btn small ghost" onclick="resetGrupo(${g.id})">🔃 Reset</button>
