@@ -79,6 +79,13 @@
   .nicho-actions{display:flex;gap:8px;margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
   .nicho-actions button{flex:1}
 
+  .nicho-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;padding:12px 0;margin-bottom:12px;border-bottom:1px solid var(--border)}
+  .nicho-header-left{display:flex;align-items:center;gap:12px;flex:1}
+  .nicho-toggle{font-size:18px;color:var(--green);transition:transform .2s}
+  .nicho-toggle.open{transform:rotate(90deg)}
+  .nicho-content{max-height:none;overflow:hidden;transition:max-height .3s ease-out}
+  .nicho-content.collapsed{max-height:0;padding:0!important}
+
   .add-nicho{text-align:center;padding:40px 20px}
   .add-nicho button{font-size:16px;padding:14px 24px}
 
@@ -675,16 +682,20 @@ function renderNicho(n){
   const badge = esCol ? '🤝 Compartido' : '👤 Tuyo';
 
   card.innerHTML = `
-    <div class="nicho-head">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    <div class="nicho-header" onclick="toggleNicho(event, ${n.id})">
+      <div class="nicho-header-left">
+        <div class="nicho-toggle open">▶</div>
         <div>
           <div class="nicho-nombre">${n.nombre}</div>
           <div style="font-size:11px;color:var(--muted);margin-top:2px">${badge}</div>
         </div>
       </div>
-      <div class="grupo-estado ${n.grupos && n.grupos[0]?.estado || 'cola'}" style="margin-top:8px">${n.grupos && n.grupos[0]?.estado || 'cola'}</div>
     </div>
-    <div class="link-maestro-box">
+    <div class="nicho-content" id="nicho-content-${n.id}">
+      <div class="nicho-head">
+        <div class="grupo-estado ${n.grupos && n.grupos[0]?.estado || 'cola'}" style="margin-bottom:8px">${n.grupos && n.grupos[0]?.estado || 'cola'}</div>
+      </div>
+      <div class="link-maestro-box">
       <span class="link-maestro-label">🔗 Link Maestro</span>
       <div class="link-maestro">
         <span class="link-maestro-text">${linkMaestro}</span>
@@ -707,6 +718,7 @@ function renderNicho(n){
       ` : `
         <div style="font-size:11px;color:var(--muted);padding:8px;text-align:center">Acceso compartido (lectura)</div>
       `}
+    </div>
     </div>
   `;
 
@@ -957,6 +969,15 @@ async function quitarColaborador(id){
 }
 
 // ---------- ACCORDION Y CLICS ----------
+function toggleNicho(event, nichoId){
+  event.stopPropagation();
+  const header = event.currentTarget;
+  const content = header.nextElementSibling;
+  const toggle = header.querySelector('.nicho-toggle');
+  content.classList.toggle('collapsed');
+  toggle.classList.toggle('open');
+}
+
 function toggleGrupo(header){
   const content = header.nextElementSibling;
   const toggle = header.querySelector('.grupo-toggle');
