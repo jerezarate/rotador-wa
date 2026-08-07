@@ -757,7 +757,7 @@ function renderNicho(n){
               ${g.estado === 'lleno' ? '🔄 Reabrir' : '🔴 Llenar'}
             </button>
             <button class="btn small ghost" onclick="resetGrupo(${g.id})">🔃 Reset</button>
-            ${!esColaborador[${n.id}] ? `<button class="btn small danger" onclick="borrarGrupo(${g.id})">🗑️ Del</button>` : ''}
+            ${!esColaborador[n.id] ? `<button class="btn small danger" onclick="borrarGrupo(${g.id})">🗑️ Del</button>` : ''}
           </div>
         </div>
       `;
