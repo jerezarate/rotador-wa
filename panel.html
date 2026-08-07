@@ -50,21 +50,31 @@
   .umbral-row button{padding:6px 12px;font-size:12px}
 
   .grupos-list{margin-bottom:12px}
-  .grupo-item{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;transition:all .2s}
+  .grupo-item{background:var(--panel2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:all .2s;overflow:hidden}
   .grupo-item:hover{border-color:var(--green)}
+  .grupo-header{padding:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;user-select:none}
+  .grupo-header:hover{background:rgba(37,211,102,.05)}
+  .grupo-toggle{font-size:14px;color:var(--green);transition:transform .2s;flex-shrink:0}
+  .grupo-toggle.open{transform:rotate(90deg)}
   .grupo-info{flex:1;min-width:0}
-  .grupo-label{font-size:12px;color:var(--muted);margin-bottom:4px}
+  .grupo-label{font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600}
   .grupo-url{font-family:var(--mono);font-size:11px;color:var(--green);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
-  .grupo-barra{height:5px;background:var(--bg);border-radius:99px;margin-top:6px;overflow:hidden;min-width:60px}
-  .grupo-barra i{display:block;height:100%;background:var(--green);border-radius:99px}
+  .grupo-barra{height:4px;background:var(--bg);border-radius:99px;margin-top:6px;overflow:hidden;min-width:60px;flex-shrink:0}
+  .grupo-barra i{display:block;height:100%;background:var(--green);border-radius:99px;transition:all .2s}
   .grupo-barra i.full{background:var(--red)}
-  .grupo-clics{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right}
-  .grupo-estado{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-bottom:4px}
-  .grupo-estado.activo{background:rgba(37,211,102,.15);color:var(--green)}
-  .grupo-estado.lleno{background:rgba(242,109,109,.15);color:var(--red)}
+  .grupo-clics{font-family:var(--mono);font-size:11px;color:var(--text);font-weight:600;flex-shrink:0}
+  .grupo-estado{display:inline-block;padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;margin-bottom:4px}
+  .grupo-estado.activo{background:rgba(37,211,102,.2);color:var(--green)}
+  .grupo-estado.lleno{background:rgba(242,109,109,.2);color:var(--red)}
   .grupo-estado.cola{background:rgba(134,150,160,.15);color:var(--muted)}
-  .grupo-acciones{display:flex;flex-direction:column;gap:4px}
-  .grupo-acciones button{padding:4px 8px;font-size:11px;width:60px}
+  .grupo-estado.nuevo{background:rgba(245,185,66,.2);color:var(--amber)}
+  .grupo-content{display:none;padding:0 12px 12px;border-top:1px solid var(--border)}
+  .grupo-content.open{display:block}
+  .grupo-detalles{margin-bottom:12px}
+  .grupo-detalles-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+  .grupo-detalles-row:last-child{border-bottom:none}
+  .grupo-acciones{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+  .grupo-acciones button{flex:1;min-width:80px}
 
   .nicho-actions{display:flex;gap:8px;margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
   .nicho-actions button{flex:1}
@@ -706,21 +716,48 @@ function renderNicho(n){
       const prog = Math.min(100, Math.round((g.clics / n.umbral) * 100));
       const item = document.createElement("div");
       item.className = "grupo-item";
+
+      // Determinar estado visual
+      let estadoVisual = g.estado;
+      if(g.clics === 0) estadoVisual = 'nuevo';
+      else if(g.estado === 'cola' && g.clics > 0 && g.clics < n.umbral) estadoVisual = 'activo';
+
+      const estadoLabel = estadoVisual === 'nuevo' ? '🆕 NUEVO' :
+                         estadoVisual === 'activo' ? '🔴 ACTIVO' :
+                         estadoVisual === 'lleno' ? '🔴 LLENO' : '⚪ VACÍO';
+
       item.innerHTML = `
-        <div class="grupo-info">
-          <div class="grupo-estado ${g.estado}">${g.estado}</div>
-          <div class="grupo-label">${g.etiqueta || `Grupo ${i+1}`}</div>
-          <div class="grupo-url">${g.url}</div>
+        <div class="grupo-header" onclick="toggleGrupo(this)">
+          <div style="flex:1;min-width:0">
+            <div class="grupo-label">${g.etiqueta || `Grupo ${i+1}`}</div>
+            <div class="grupo-url">${g.url}</div>
+          </div>
           <div class="grupo-barra"><i style="width:${prog}%" class="${prog >= 100 ? 'full' : ''}"></i></div>
+          <div class="grupo-clics">${g.clics}/${n.umbral}</div>
+          <div class="grupo-toggle">▶</div>
         </div>
-        <div class="grupo-clics" style="flex-shrink:0">
-          <div>${g.clics}/${n.umbral}</div>
-          <div style="font-size:10px;margin-top:4px">
+        <div class="grupo-content">
+          <div class="grupo-detalles">
+            <div class="grupo-detalles-row">
+              <div>Estado</div>
+              <div class="grupo-estado ${estadoVisual}">${estadoLabel}</div>
+            </div>
+            <div class="grupo-detalles-row">
+              <div>Progreso</div>
+              <div style="font-size:11px;color:var(--text)">${prog}% lleno</div>
+            </div>
+            <div class="grupo-detalles-row">
+              <div>Clics</div>
+              <div style="font-size:11px;color:var(--green);font-weight:600">${g.clics} / ${n.umbral}</div>
+            </div>
+          </div>
+          <div class="grupo-acciones">
+            <button class="btn small" onclick="sumarClics(${g.id}, ${n.id})">➕ +1 Clic</button>
             <button class="btn small ghost" onclick="accionGrupo(${g.id},'${g.estado === 'lleno' ? 'reabrir' : 'lleno'}')">
-              ${g.estado === 'lleno' ? 'Reabrir' : 'Llenar'}
+              ${g.estado === 'lleno' ? '🔄 Reabrir' : '🔴 Llenar'}
             </button>
-            <button class="btn small ghost" onclick="resetGrupo(${g.id})" style="margin-top:4px">Reset</button>
-            <button class="btn small danger" onclick="borrarGrupo(${g.id})" style="margin-top:4px">Del</button>
+            <button class="btn small ghost" onclick="resetGrupo(${g.id})">🔃 Reset</button>
+            ${!esColaborador[${n.id}] ? `<button class="btn small danger" onclick="borrarGrupo(${g.id})">🗑️ Del</button>` : ''}
           </div>
         </div>
       `;
@@ -917,6 +954,26 @@ async function quitarColaborador(id){
   await api(`/api/colaboradores/${id}`,{method:"DELETE"});
   colaboradores = await api("/api/colaboradores");
   renderColaboradores();
+}
+
+// ---------- ACCORDION Y CLICS ----------
+function toggleGrupo(header){
+  const content = header.nextElementSibling;
+  const toggle = header.querySelector('.grupo-toggle');
+  content.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
+async function sumarClics(grupoId, nichoId){
+  try {
+    // Sumar un clic al grupo
+    await api(`/api/grupos/${grupoId}`,{method:"PATCH",body:JSON.stringify({accion:"sumar_clic"})});
+    nichos = await api("/api/listas");
+    renderPanel();
+    toast("✅ +1 Clic registrado");
+  } catch(e) {
+    toast("Error al sumar clic");
+  }
 }
 
 async function logout(){

@@ -796,6 +796,7 @@ app.patch("/api/grupos/:id", auth, (req, res) => {
       if (accion === "lleno") updates.push(() => db.run("UPDATE grupos SET estado='lleno' WHERE id=?", [g.id]));
       if (accion === "reabrir") updates.push(() => db.run("UPDATE grupos SET estado='cola' WHERE id=?", [g.id]));
       if (accion === "reset_clics") updates.push(() => db.run("UPDATE grupos SET clics=0 WHERE id=?", [g.id]));
+      if (accion === "sumar_clic") updates.push(() => db.run("UPDATE grupos SET clics=clics+1 WHERE id=?", [g.id]));
       if (url) updates.push(() => db.run("UPDATE grupos SET url=? WHERE id=?", [url, g.id]));
       if (etiqueta !== undefined) updates.push(() => db.run("UPDATE grupos SET etiqueta=? WHERE id=?", [etiqueta, g.id]));
 
